@@ -2,18 +2,21 @@ const mongoose = require("mongoose");
 
 const paymentSchema = new mongoose.Schema(
   {
-    paymentId: { type: String, required: true, unique: true, index: true },
+    paymentId: { type: String, index: true },
     bookingId: { type: String, required: true, index: true },
+
     customerName: { type: String, default: "" },
-    amount: { type: Number, required: true },
+    amount: { type: Number, default: 0 },
     paymentMode: { type: String, default: "" },
-    date: { type: String, default: "" },
+
+    date: { type: String, default: "" }, // "DD/MM/YYYY"
     time: { type: String, default: "" },
 
-    // keep original object (excel keys)
-    raw: { type: Object, default: {} }
+    raw: { type: Object, default: {} },
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model("Payment", paymentSchema);
+
+

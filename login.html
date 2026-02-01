@@ -2,113 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Sai Ganga - Login</title>
+  <title>Sai Ganga Hotel - Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" type="images/jpg" href="images/ART_page-0001 copy.jpg">
+  <link rel="icon" href="images/ART_page-0001 copy.jpg">
 </head>
 
 <body>
-  <div class="login-box">
-    <div class="logo">
-      <img src="images/ART_page-0001 copy.jpg" alt="Sai Ganga Logo"
-           onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 200\'%3E%3Ccircle cx=\'100\' cy=\'100\' r=\'95\' fill=\'%23FFD700\'/%3E%3Ctext x=\'100\' y=\'120\' font-size=\'100\' text-anchor=\'middle\' fill=\'%23C41E3A\'%3E🏨%3C/text%3E%3C/svg%3E'">
-    </div>
 
-    <div class="title">Welcome Back</div>
-
-    <input id="username" type="text" placeholder="Username" autocomplete="username">
-    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-
-    <button onclick="login()">Login</button>
-
-    <div class="error" id="error">Invalid username or password</div>
+<div class="login-box">
+  <div class="logo">
+    <img src="images/ART_page-0001 copy.jpg" alt="Sai Ganga Hotel">
   </div>
 
-<script>
-    // ✅ FIXED: Direct connection to localhost
-    const API_URL = 'http://localhost:3001/api';
-    
-    const VALID_USER = "admin";
-    const VALID_PASS = "admin@123";
+  <div class="title">Admin Login</div>
 
-    window.addEventListener('DOMContentLoaded', () => {
-        console.log('🔗 API URL:', API_URL);
-        
-        const sessionId = sessionStorage.getItem('hotelSessionId');
-        if (sessionId) {
-            fetch(`${API_URL}/verify-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.valid) {
-                    console.log('✅ Already logged in, redirecting...');
-                    window.location.href = 'dashboard.html';
-                }
-            })
-            .catch(err => console.log('Session check failed:', err));
-        }
+  <input id="username" type="text" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
+
+  <button id="loginBtn" onclick="login()">Login</button>
+
+  <div class="error" id="error"></div>
+</div>
+
+<script>
+const API_URL = "http://localhost:3001/api";
+
+async function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+  const errorBox = document.getElementById("error");
+  const btn = document.getElementById("loginBtn");
+
+  errorBox.textContent = "";
+
+  if (!username || !password) {
+    errorBox.textContent = "Please enter username and password";
+    return;
+  }
+
+  try {
+    btn.textContent = "⏳ Logging in...";
+    btn.disabled = true;
+
+    const res = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
     });
 
-    async function login() {
-        const u = document.getElementById("username").value.trim();
-        const p = document.getElementById("password").value.trim();
-        const errorBox = document.getElementById("error");
-        const loginBtn = event.target;
+    const data = await res.json();
 
-        errorBox.style.display = "none";
-
-        if (u === "" || p === "") {
-            errorBox.innerText = "Please enter username and password";
-            errorBox.style.display = "block";
-            return;
-        }
-
-        if (u === VALID_USER && p === VALID_PASS) {
-            try {
-                loginBtn.textContent = '⏳ Logging in...';
-                loginBtn.disabled = true;
-
-                const response = await fetch(`${API_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: u, password: p })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    sessionStorage.setItem('hotelSessionId', data.sessionId);
-                    sessionStorage.setItem('hotelLoggedIn', 'true');
-                    sessionStorage.setItem('hotelUsername', u);
-                    
-                    console.log('✅ Login successful, redirecting...');
-                    window.location.href = 'dashboard.html';
-                } else {
-                    throw new Error('Login failed');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                errorBox.innerText = "⚠️ Server connection failed. Please try again.";
-                errorBox.style.display = "block";
-                loginBtn.textContent = 'Login';
-                loginBtn.disabled = false;
-            }
-        } else {
-            errorBox.innerText = "Invalid username or password";
-            errorBox.style.display = "block";
-        }
+    if (!data.success) {
+      throw new Error("Invalid credentials");
     }
 
-    document.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            login();
-        }
-    });
+    // ✅ Save session
+    localStorage.setItem("sessionId", data.sessionId);
+
+    // ✅ Redirect
+    window.location.href = "dashboard.html";
+
+  } catch (err) {
+    errorBox.textContent = "❌ Invalid username or password";
+    btn.textContent = "Login";
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter") login();
+});
 </script>
+
 </body>
 </html>

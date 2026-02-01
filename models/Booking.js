@@ -1,5 +1,15 @@
 const mongoose = require("mongoose");
 
+const foodItemSchema = new mongoose.Schema(
+  {
+    name: String,
+    quantity: Number,
+    price: Number,
+    total: Number,
+  },
+  { _id: false }
+);
+
 const bookingSchema = new mongoose.Schema(
   {
     bookingId: { type: String, index: true },
@@ -22,6 +32,7 @@ checkOutDate: { type: String, default: "" },
     totalAmount: { type: Number, default: 0 },
     advance: { type: Number, default: 0 },
     balance: { type: Number, default: 0 },
+    foodOrders: { type: [foodItemSchema], default: [] },
 
     // ✅ store full original bookingData also (so no UI breaks)
     raw: { type: Object, default: {} }

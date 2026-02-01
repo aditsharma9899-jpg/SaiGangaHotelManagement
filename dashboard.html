@@ -30,9 +30,9 @@
                 <div class="menu-item" onclick="showSection('advanceBooking', event)">
                   📋 Advance Booking
                 </div>
-                <div class="menu-item" onclick="showSection('rooms', event)">
-                    🛏️ Rooms
-                </div>
+                <div class="menu-item" onclick="showSection('roomStatus', event)">
+  🏷️ Room Status
+</div>
                 <div class="menu-item" onclick="showSection('bookings', event)">
                     📅 All Bookings
                 </div>
@@ -48,6 +48,8 @@
                 <div class="menu-item" onclick="showSection('payments', event)">
                     💳 Payments
                 </div>
+                <div class="menu-item" onclick="showSection('downloads', event)">⬇️ Downloads</div>
+
                 <div class="menu-item" onclick="showSection('staff', event)">
                     👨‍💼 Staff Management
                 </div>
@@ -180,6 +182,11 @@
             </div>
 
             <!-- ✅ EDITABLE NIGHTS & ROOM AMOUNT -->
+            
+            
+            
+            
+            
             <div class="form-row">
                 <div class="form-group">
                     <label>Number of Nights * <small style="color: #27ae60;">(Editable)</small></label>
@@ -241,48 +248,9 @@
             </div>
 
             <!-- Document Upload Section -->
-            <div style="margin: 20px 0; padding: 20px; border: 2px dashed #3498db; border-radius: 8px; background: #f0f8ff;">
-                <h3 style="margin-bottom: 15px; color: #2c3e50;">📎 Upload Documents</h3>
+           
                 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Document 1st Front</label>
-                        <input type="file" id="doc1Front" accept="image/*,.pdf" 
-                               onchange="displayFileName('doc1Front', 'file1Name')"
-                               style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; background: white;">
-                        <small id="file1Name" style="display: block; margin-top: 5px; color: #27ae60;"></small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Document 1st Back</label>
-                        <input type="file" id="doc1Back" accept="image/*,.pdf"
-                               onchange="displayFileName('doc1Back', 'file2Name')"
-                               style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; background: white;">
-                        <small id="file2Name" style="display: block; margin-top: 5px; color: #27ae60;"></small>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Document 2nd Front</label>
-                        <input type="file" id="doc2Front" accept="image/*,.pdf"
-                               onchange="displayFileName('doc2Front', 'file3Name')"
-                               style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; background: white;">
-                        <small id="file3Name" style="display: block; margin-top: 5px; color: #27ae60;"></small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Document 2nd Back</label>
-                        <input type="file" id="doc2Back" accept="image/*,.pdf"
-                               onchange="displayFileName('doc2Back', 'file4Name')"
-                               style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; background: white;">
-                        <small id="file4Name" style="display: block; margin-top: 5px; color: #27ae60;"></small>
-                    </div>
-                </div>
-                
-                <small style="display: block; margin-top: 10px; color: #666; text-align: center;">
-                    📄 Accepted formats: Images (JPG, PNG) or PDF | Max size per file: 5MB
-                </small>
+                <div id="docsContainer"></div>
             </div>
 
             <div style="margin-top: 20px;">
@@ -290,7 +258,7 @@
             </div>
         </form>
     </div>
-</div>
+
 <!-- Advance Booking Section -->
             <div id="advanceBooking" class="content-section">
                 <div class="card">
@@ -385,15 +353,9 @@
             </div>
 
             <!-- Rooms Section -->
-            <div id="rooms" class="content-section">
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Room Status</h2>
-                    </div>
-                    <div id="roomsStatus"></div>
-                </div>
-            </div>
-
+            <div id="roomStatus" class="content-section">
+  <div id="roomStatusContainer"></div>
+</div>
             <!-- All Bookings Section -->
             <div id="bookings" class="content-section">
                 <div class="card">
@@ -403,7 +365,7 @@
                             <input type="text" id="searchInput" placeholder="🔍 Search by ID, Name, Mobile, Room..." 
                                    style="padding: 10px; border-radius: 5px; border: 1px solid #ddd; width: 300px; max-width: 100%;"
                                    onkeyup="searchBookings()">
-                            <button class="btn btn-primary" onclick="exportExcel()">⬇️ Export Excel</button>
+                            
                         </div>
                     </div>
                     <div style="overflow-x: auto;">
@@ -581,7 +543,27 @@
                 </div>
             </div>
 
+            <div id="downloads" class="content-section">
+  <div class="card">
+    <div class="card-header">
+      <h2>⬇️ Download Data</h2>
+      <div style="font-size: 12px; color: #7f8c8d;">Download different data in Excel format</div>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px;">
+      <button class="btn btn-primary" onclick="downloadExcel('staff')">⬇️ Staff Excel</button>
+      <button class="btn btn-primary" onclick="downloadExcel('customers')">⬇️ Customers Excel</button>
+      <button class="btn btn-primary" onclick="downloadExcel('foods')">⬇️ Food Excel</button>
+      <button class="btn btn-primary" onclick="downloadExcel('bookings')">⬇️ Bookings Excel</button>
+      <button class="btn btn-primary" onclick="downloadExcel('payments')">⬇️ Payments Excel</button>
+      <button class="btn btn-primary" onclick="downloadExcel('attendance')">⬇️ Attendance Excel</button>
+    </div>
+  </div>
+</div>
+
+
             <!-- Attendance Calendar Section -->
+             
             <div id="attendanceCalendar" class="content-section">
                 <div class="card">
                     <div class="card-header">

@@ -3,14 +3,29 @@ const router = express.Router();
 
 const Booking = require("../models/Booking");
 const Room = require("../models/Rooms")
+const Payment = require("../models/Payments");
 
 /* ------------------ Helpers ------------------ */
+function parseRoomNumbers(input) {
+  if (!input) return [];
 
-function parseRoomNumbers(roomNumberStr) {
+  // input can be ["101","102"] OR "101, 102"
+  if (Array.isArray(input)) {
+    return input.map(x => String(x).trim()).filter(Boolean);
+  }
+
+  return String(input)
+    .split(",")
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+
+/*function parseRoomNumbers(roomNumberStr) {
   if (!roomNumberStr || typeof roomNumberStr !== "string") return [];
   if (roomNumberStr.includes("TBD")) return [];
   return roomNumberStr.split(",").map(s => s.trim()).filter(Boolean);
-}
+}*/
 
 function computeAmounts(raw) {
   const nights = parseInt(raw.Nights || raw.nights) || 1;
@@ -48,33 +63,136 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.post("/:bookingId/add-food", async (req, res) => {
+  try {
+    const bookingId = req.params.bookingId;
+
+    const foodItems = Array.isArray(req.body.foodItems) ? req.body.foodItems : [];
+    const foodTotal = Number(req.body.foodTotal || 0);
+
+    if (!foodItems.length || foodTotal <= 0) {
+      return res.status(400).json({ success: false, error: "foodItems and foodTotal are required" });
+    }
+
+    const booking = await Booking.findOne({ bookingId });
+    if (!booking) return res.status(404).json({ success: false, error: "Booking not found" });
+
+    booking.foodOrders = Array.isArray(booking.foodOrders) ? booking.foodOrders : [];
+    booking.foodOrders.push(...foodItems);
+
+    const oldAdditional = Number(booking.additionalAmount || 0);
+    booking.additionalAmount = oldAdditional + foodTotal;
+
+    const roomAmount = Number(booking.roomAmount || 0);
+    booking.totalAmount = roomAmount + Number(booking.additionalAmount || 0);
+
+    // ✅ recalc paid from payments
+    const payDocs = await Payment.find({ bookingId });
+    const totalPaid = payDocs.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    booking.advance = totalPaid; // keep as total paid
+    booking.balance = booking.totalAmount - totalPaid;
+
+    await booking.save();
+
+    res.json({
+      success: true,
+      booking: {
+        bookingId: booking.bookingId,
+        additionalAmount: booking.additionalAmount,
+        totalAmount: booking.totalAmount,
+        advance: booking.advance,
+        balance: booking.balance,
+        foodOrders: booking.foodOrders,
+      },
+    });
+  } catch (err) {
+    console.error("❌ add-food:", err);
+    res.status(500).json({ success: false, error: "Failed to add food" });
+  }
+});
+
+
 /* ------------------ POST CREATE (from previous message) ------------------ */
 router.post("/", async (req, res) => {
   try {
-    console.log('whole body data is',req.body);
+
+    console.log('booking data',req.body)
     const raw = req.body || {};
 
-    const { nights, roomPricePerNight, additionalAmount, roomAmount, totalAmount, advance, balance } =
-      computeAmounts(raw);
+    // ✅ Normalize values (support both Mongo style + Excel style)
+    const bookingId = raw.bookingId || raw["Booking ID"] || "";
+    const customerName = raw.customerName || raw["Customer Name"] || "";
+    const mobile = raw.mobile || raw["Mobile"] || "";
 
-    const bookingId = raw["Booking ID"] || raw.bookingId || "";
-    const customerName = raw["Customer Name"] || raw.customerName || "";
-    const mobile = raw["Mobile"] || raw.mobile || "";
+    // ✅ Dates (your frontend sends checkInDate/checkOutDate)
+    const checkInDate = raw.checkInDate || raw["Check In"] || "";
+    const checkInTime = raw.checkInTime || raw["Check In Time"] || "";
+    const checkOutDate = raw.checkOutDate || raw["Check Out"] || "";
 
-    const roomNumbers = Array.isArray(req.body.rooms)
-  ? req.body.rooms.map(r => String(r.number)).filter(Boolean)
-  : [];
+    const status = raw.status || raw.Status || raw["Status"] || "";
 
-console.log("➡️ Rooms to occupy:", roomNumbers);
+    const nights = Number(raw.nights ?? raw.Nights ?? 1) || 1;
 
+    // ✅ Rooms
+    const roomNumbers = Array.isArray(raw.rooms)
+      ? raw.rooms.map(r => String(r.number)).filter(Boolean)
+      : Array.isArray(raw.roomNumbers)
+        ? raw.roomNumbers.map(String)
+        : [];
+
+    // ✅ Amounts (support all keys)
+    const roomPricePerNight = Number(raw.roomPricePerNight ?? raw["Room Price Per Night"] ?? 0) || 0;
+    const additionalAmount  = Number(raw.additionalAmount ?? raw["Additional Amount"] ?? 0) || 0;
+
+    // roomAmount can be sent OR calculated
+    const roomAmount = Number(
+      raw.roomAmount ?? raw["Room Amount"] ?? (roomPricePerNight * nights)
+    ) || 0;
+
+    // totalAmount can be sent OR calculated
+    const totalAmount = Number(
+      raw.totalAmount ?? raw["Total Amount"] ?? (roomAmount + additionalAmount)
+    ) || 0;
+
+    // ✅ advance can come as advance OR advanceAmount
+    const advance = Number(
+      raw.advance ?? raw["Advance"] ?? raw.advanceAmount ?? 0
+    ) || 0;
+
+    // ✅ balance always should be total - paid
+    const balance = Number(raw.balance ?? raw["Balance"] ?? (totalAmount - advance));
+
+    // ✅ Also keep an excel-like raw object so old UI never breaks
+    const excelRaw = {
+      ...raw,
+      "Booking ID": bookingId,
+      "Customer Name": customerName,
+      "Mobile": mobile,
+      "Room Number": roomNumbers.length ? roomNumbers.join(", ") : (raw.roomNumbers || "TBD"),
+      "Check In": checkInDate,
+      "Check In Time": checkInTime,
+      "Check Out": checkOutDate,
+      "Nights": nights,
+      "Room Price Per Night": roomPricePerNight,
+      "Room Amount": roomAmount,
+      "Additional Amount": additionalAmount,
+      "Total Amount": totalAmount,
+      "Advance": advance,
+      "Balance": balance,
+      "Status": status,
+    };
+
+    // ✅ Save booking
     const created = await Booking.create({
       bookingId,
       customerName,
       mobile,
-      roomNumbers,
-      status: raw.Status || raw.status || "",
-      checkIn: raw["Check In"] || raw.checkIn || "",
-      checkOut: raw["Check Out"] || raw.checkOut || "",
+      roomNumbers,            // normalized
+      status,
+      checkInDate,            // ✅ schema field
+      checkInTime,
+      checkOutDate,           // ✅ schema field
       nights,
       roomPricePerNight,
       additionalAmount,
@@ -82,22 +200,10 @@ console.log("➡️ Rooms to occupy:", roomNumbers);
       totalAmount,
       advance,
       balance,
-      raw
+      raw: excelRaw
     });
 
-    // roomNumbers from mongoBookingData
-
-
-if (roomNumbers.length > 0) {
-  const updateResult = await Room.updateMany(
-    { roomNumber: { $in: roomNumbers } },
-    { $set: { status: "occupied" } }
-  );
-
-  console.log("✅ Room update result:", updateResult);
-}
-
-
+    // ✅ Occupy rooms only when rooms exist
     if (roomNumbers.length > 0) {
       await Room.updateMany(
         { roomNumber: { $in: roomNumbers } },
@@ -105,12 +211,68 @@ if (roomNumbers.length > 0) {
       );
     }
 
-    res.json({ success: true, booking: created.raw });
+    return res.json({ success: true, booking: created });
   } catch (error) {
     console.error("❌ Error creating booking:", error);
-    res.status(500).json({ success: false, error: "Failed to create booking" });
+    return res.status(500).json({ success: false, error: "Failed to create booking" });
   }
 });
+
+
+router.get("/search", async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    const page = parseInt(req.query.page || "1", 10);
+    const limit = parseInt(req.query.limit || "50", 10);
+
+    // If empty query => return latest bookings (or you can return [] if you want)
+    const filter = {};
+
+    if (q) {
+      const isNumberLike = /^[0-9]+$/.test(q);
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); // safe regex
+
+      filter.$or = [
+        { bookingId: regex },
+        { customerName: regex },
+        { status: regex },
+        { roomNumbers: regex }, // matches any element in array
+      ];
+
+      // Mobile search: exact or partial
+      if (isNumberLike) {
+        filter.$or.push({ mobile: new RegExp(q, "i") });
+      } else {
+        filter.$or.push({ mobile: regex });
+      }
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      Booking.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Booking.countDocuments(filter),
+    ]);
+
+    return res.json({
+      success: true,
+      q,
+      page,
+      limit,
+      total,
+      items,
+    });
+  } catch (err) {
+    console.error("❌ Search bookings error:", err);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
+module.exports = router;
 
 /* ------------------ PUT UPDATE BOOKING ------------------ */
 // ✅ PUT /newapi/bookings/:id   (id = BK0001)
@@ -269,27 +431,39 @@ router.delete("/:id", async (req, res) => {
 
 /* ------------------ CHECKOUT ------------------ */
 // ✅ POST /newapi/bookings/:id/checkout
+// POST /newapi/bookings/:id/checkout
 router.post("/:id/checkout", async (req, res) => {
   try {
     const bookingId = req.params.id;
 
     const bookingDoc = await Booking.findOne({ bookingId });
-    if (!bookingDoc) return res.status(404).json({ success: false, error: "Booking not found" });
+    if (!bookingDoc) {
+      return res.status(404).json({ success: false, error: "Booking not found" });
+    }
+
+    // ✅ compute paid from DB (not frontend)
+    const payments = await Payment.find({ bookingId });
+    const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+    bookingDoc.advance = totalPaid;
+    bookingDoc.balance = Number(bookingDoc.totalAmount || 0) - totalPaid;
+
+    const checkoutTime = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    const checkoutDate = new Date().toLocaleDateString("en-GB");
 
     const raw = { ...(bookingDoc.raw || {}) };
-
-    const checkoutTime = new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-
     raw["Check Out Time"] = checkoutTime;
-    raw.Status = "Checked Out";
+    raw["Check Out Date"] = checkoutDate;
+    raw["status"] = "Checked Out"; // keep same key style as your UI uses
+    raw["Status"] = "Checked Out";
 
-    // free rooms
-    const roomStr = raw["Room Number"] || raw.roomNumber || "TBD";
-    const roomNumbers = parseRoomNumbers(roomStr);
+    // ✅ get rooms
+    const roomNumbers =
+      (Array.isArray(bookingDoc.roomNumbers) && bookingDoc.roomNumbers.length > 0)
+        ? parseRoomNumbers(bookingDoc.roomNumbers)
+        : parseRoomNumbers(raw["Room Number"] || raw.roomNumber || "");
 
+    // ✅ free rooms
     if (roomNumbers.length > 0) {
       await Room.updateMany(
         { roomNumber: { $in: roomNumbers } },
@@ -297,17 +471,26 @@ router.post("/:id/checkout", async (req, res) => {
       );
     }
 
-    const saved = await Booking.findOneAndUpdate(
-      { bookingId },
-      { status: "Checked Out", roomNumbers: [], raw },
-      { new: true }
-    );
+    // ✅ update booking
+    bookingDoc.status = "Checked Out";
+    // IMPORTANT: don't clear roomNumbers, otherwise history is lost
+    // bookingDoc.roomNumbers = [];
+    bookingDoc.raw = raw;
 
-    res.json({ success: true, checkoutTime, booking: saved.raw });
+    await bookingDoc.save();
+
+    return res.json({
+      success: true,
+      checkoutTime,
+      checkoutDate,
+      freedRooms: roomNumbers,
+      booking: bookingDoc,
+    });
   } catch (error) {
     console.error("❌ Error during checkout:", error);
-    res.status(500).json({ success: false, error: "Failed to checkout" });
+    res.status(500).json({ success: false, error: error.message || "Failed to checkout" });
   }
 });
+
 
 module.exports = router;
