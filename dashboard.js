@@ -15,7 +15,7 @@
   }
 
   try {
-    const res = await fetch("http://localhost:3001/api/verify-session", {
+    const res = await fetch("https://saigangahotelmanagement.onrender.com/api/verify-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId })
@@ -37,7 +37,7 @@
 const API_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:3001/newapi"
-    : "/api";
+    : "https://saigangahotelmanagement.onrender.com/api";
 
 const HOTEL_ADDRESS = `ADDRESS: NAGAR, SHRIDI ROAD, GUHA, TALUKA RAHURI,
 DIST: AHILYANAGAR, STATE: MAHARASHTRA, PINCODE: 413706`;
